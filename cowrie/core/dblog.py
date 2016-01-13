@@ -20,8 +20,10 @@ class DBLogger(object):
         self.sessions = {}
         self.ttylogs = {}
         #:* Handles ipv6 
+        # FIXME figure out what needs to be done here regarding
+        #       HoneyPotTransport renamed to HoneyPotSSHTransport
         self.re_sessionlog = re.compile(
-            r'.*HoneyPotTransport,([0-9]+),[:a-f0-9.]+$')
+            r'.*HoneyPotSSHTransport,([0-9]+),[:a-f0-9.]+$')
 
         # cowrie.session.connect is special since it kicks off new logging session,
         # and is not handled here
