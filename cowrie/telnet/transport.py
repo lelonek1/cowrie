@@ -111,11 +111,11 @@ class HoneyPotTelnetAuthProtocol(AuthenticatingTelnetProtocol, TimeoutMixin):
         sessionno = self.transport.transport.sessionno
         self.factory.sessions[sessionno] = self.transportId
 
-        log.msg(eventid='COW0001',
+        log.msg(eventid='cowrie.session.connect',
            format='New connection: %(src_ip)s:%(src_port)s (%(dst_ip)s:%(dst_port)s) [session: %(sessionno)s]',
            src_ip=self.transport.getPeer().host, src_port=self.transport.getPeer().port,
            dst_ip=self.transport.getHost().host, dst_port=self.transport.getHost().port,
-           id=self.transportId, sessionno=sessionno)
+           session=self.transportId, sessionno=sessionno)
 
         # I need to doubly escape here since my underlying
         # StripCrTelnetTransport hack would remove it and leave just \n
@@ -134,7 +134,7 @@ class HoneyPotTelnetAuthProtocol(AuthenticatingTelnetProtocol, TimeoutMixin):
         if self.transport.transport.sessionno in self.factory.sessions:
             del self.factory.sessions[self.transport.transport.sessionno]
         # TODO aligned upstream changed logging after I rebase
-        log.msg(eventid='COW0011', format='Connection lost')
+        log.msg(eventid='cowrie.session.closed', format='Connection lost')
 
         AuthenticatingTelnetProtocol.connectionLost(self, reason)
 

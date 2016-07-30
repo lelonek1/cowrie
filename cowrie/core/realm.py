@@ -81,7 +81,7 @@ class HoneyPotRealm(object):
             user = avatar.CowrieUser(avatarId, serv)
             return interfaces[0], user, user.logout
         elif ITelnetProtocol in interfaces:
-            cs = server.CowrieServer(self.cfg)
+            cs = server.CowrieServer(self)
             av = session.HoneyPotTelnetSession(avatarId, cs)
             return interfaces[0], av, lambda:None
 
