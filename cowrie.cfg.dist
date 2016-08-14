@@ -168,20 +168,21 @@ auth_class = UserDB
 # ============================================================================
 # SSH Specific Options
 # ============================================================================
+[ssh]
 
 
 # IP addresses to listen for incoming SSH connections.
 #
 # (default: 0.0.0.0) = any IPv4 address
-#listen_ssh_addr = 0.0.0.0
+#listen_addr = 0.0.0.0
 # (use :: for listen to all IPv6 and IPv4 addresses)
-#listen_ssh_addr = ::
+#listen_addr = ::
 
 
 # Port to listen for incoming SSH connections.
 #
 # (default: 2222)
-#listen_ssh_port = 2222
+#listen_port = 2222
 
 
 # SSH Version String
@@ -213,7 +214,7 @@ ssh_version_string = SSH-2.0-OpenSSH_6.0p1 Debian-4+deb7u2
 
 
 # Source Port to report in logs (useful if you use iptables to forward ports to Cowrie)
-#reported_ssh_port = 22
+#reported_port = 22
 
 
 # Public and private SSH key files. If these don't exist, they are created
@@ -248,22 +249,23 @@ forward_redirect_587 = 127.0.0.1:12525
 # ============================================================================
 # Telnet Specific Options
 # ============================================================================
+[telnet]
 
 # IP addresses to listen for incoming Telnet connections.
 #
 # (default: 0.0.0.0) = any IPv4 address
-#listen_telnet_addr = 0.0.0.0
+#listen_addr = 0.0.0.0
 # (use :: for listen to all IPv6 and IPv4 addresses)
-#listen_telnet_addr = ::
+#listen_addr = ::
 
 
 # Port to listen for incoming Telnet connections.
 #
 # (default: 2223)
-#listen_telnet_port = 2223
+#listen_port = 2223
 
 # Source Port to report in logs (useful if you use iptables to forward ports to Cowrie)
-#reported_telnet_port = 23
+#reported_port = 23
 
 
 # ============================================================================

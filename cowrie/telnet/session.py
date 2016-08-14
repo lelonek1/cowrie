@@ -18,6 +18,8 @@ from cowrie.core import protocol as cproto
 from cowrie.insults import insults
 
 class HoneyPotTelnetSession(TelnetBootstrapProtocol):
+    """
+    """
 
     def __init__(self, username, server):
         self.username = username
@@ -53,6 +55,8 @@ class HoneyPotTelnetSession(TelnetBootstrapProtocol):
 
 
     def connectionMade(self):
+        """
+        """
         processprotocol = TelnetSessionProcessProtocol(self)
 
         # If we are dealing with a proper Telnet client: enable server echo
@@ -106,10 +110,14 @@ class TelnetSessionProcessProtocol(protocol.ProcessProtocol):
 
 
     def outReceived(self, data):
+        """
+        """
         self.session.write(data)
 
 
     def errReceived(self, err):
+        """
+        """
         self.session.writeExtended(connection.EXTENDED_DATA_STDERR, err)
 
 
@@ -131,6 +139,8 @@ class TelnetSessionProcessProtocol(protocol.ProcessProtocol):
 
 
     def connectionLost(self, reason = None):
+        """
+        """
         self.session.loseConnection()
 
 
@@ -159,12 +169,18 @@ class TelnetSessionProcessProtocol(protocol.ProcessProtocol):
 
 
     def write(self, data):
+        """
+        """
         self.session.write(data)
 
 
     def writeSequence(self, seq):
+        """
+        """
         self.session.write(''.join(seq))
 
 
     def loseConnection(self):
+        """
+        """
         self.session.loseConnection()
