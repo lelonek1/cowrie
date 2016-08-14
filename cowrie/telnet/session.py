@@ -75,20 +75,23 @@ class HoneyPotTelnetSession(TelnetBootstrapProtocol):
     #    pt.connectionLost(reason)
 
 
-    # TODO this never fires in Telnet connections is it misplaced?
     def logout(self):
         """
+        TODO this never fires in Telnet connections is it misplaced?
         """
         log.msg('avatar {} logging out'.format(self.username))
 
 
-# Taken and adapted from
-# https://github.com/twisted/twisted/blob/26ad16ab41db5f0f6d2526a891e81bbd3e260247/twisted/conch/ssh/session.py#L186
+
 @implementer(interfaces.ITransport)
 class TelnetSessionProcessProtocol(protocol.ProcessProtocol):
-    """I am both an L{IProcessProtocol} and an L{ITransport}.
+    """
+    I am both an L{IProcessProtocol} and an L{ITransport}.
     I am a transport to the remote endpoint and a process protocol to the
     local subsystem.
+
+    Taken and adapted from
+    https://github.com/twisted/twisted/blob/26ad16ab41db5f0f6d2526a891e81bbd3e260247/twisted/conch/ssh/session.py#L186
     """
 
     def __init__(self, sess):
@@ -131,10 +134,12 @@ class TelnetSessionProcessProtocol(protocol.ProcessProtocol):
         self.session.loseConnection()
 
 
-    # here SSH is doing signal handling, I don't think telnet supports that so
-    # I'm simply going to bail out
     def processEnded(self, reason=None):
-        # TODO: log reason maybe?
+        """
+        here SSH is doing signal handling, I don't think telnet supports that so
+        I'm simply going to bail out
+        TODO: log reason maybe?
+        """
         log.msg("Process ended. Telnet Session disconnected")
         self.session.loseConnection()
 

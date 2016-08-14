@@ -41,10 +41,12 @@ class LoggingServerProtocol(insults.ServerProtocol):
         else:
             self.type = 'i' # Interactive
 
+
     def getSessionId(self):
         transportId = self.transport.session.conn.transport.transportId
         channelId = self.transport.session.id
         return (transportId, channelId)
+
 
     def connectionMade(self):
         """
@@ -178,6 +180,8 @@ class LoggingServerProtocol(insults.ServerProtocol):
             self.ttylog_open = False
 
         insults.ServerProtocol.connectionLost(self, reason)
+
+
 
 class LoggingTelnetServerProtocol(LoggingServerProtocol):
     """

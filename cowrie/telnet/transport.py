@@ -27,9 +27,9 @@ class HoneyPotTelnetFactory(protocol.ServerFactory):
         self.cfg = cfg
 
 
-    # TODO logging clarity can be improved: see what SSH does
     def logDispatch(self, *msg, **args):
         """
+        TODO: logging clarity can be improved: see what SSH does
         Special delivery to the loggers to avoid scope problems
         """
         for dblog in self.dbloggers:
@@ -99,6 +99,7 @@ class HoneyPotTelnetFactory(protocol.ServerFactory):
         protocol.ServerFactory.stopFactory(self)
 
 
+
 class HoneyPotTelnetAuthProtocol(AuthenticatingTelnetProtocol, TimeoutMixin):
     """
     Telnet Transport that takes care of Authentication. Once authenticated this
@@ -146,7 +147,6 @@ class HoneyPotTelnetAuthProtocol(AuthenticatingTelnetProtocol, TimeoutMixin):
         # only send ECHO option if we are chatting with a real Telnet client
         if self.transport.options:
             self.transport.will(ECHO)
-        # FIXME: this should be configurable or provided via filesystem
         self.transport.write("Password: ")
         return 'Password'
 
@@ -174,6 +174,7 @@ class HoneyPotTelnetAuthProtocol(AuthenticatingTelnetProtocol, TimeoutMixin):
 
         return 'Discard'
 
+
     def _cbLogin(self, ial):
         """
         Fired on a successful login
@@ -194,7 +195,6 @@ class HoneyPotTelnetAuthProtocol(AuthenticatingTelnetProtocol, TimeoutMixin):
         protocol.makeConnection(self.transport)
         self.transport.protocol = protocol
 
-    # TODO: provide a way to have user configurable strings for wrong password
 
 
 class StripCrTelnetTransport(TelnetTransport):
