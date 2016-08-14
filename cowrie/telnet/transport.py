@@ -147,7 +147,7 @@ class HoneyPotTelnetAuthProtocol(AuthenticatingTelnetProtocol, TimeoutMixin):
         # only send ECHO option if we are chatting with a real Telnet client
         if self.transport.options:
             self.transport.will(ECHO)
-        self.transport.write("Password: ")
+        self.transport.write(b"Password: ")
         return 'Password'
 
 
@@ -173,6 +173,14 @@ class HoneyPotTelnetAuthProtocol(AuthenticatingTelnetProtocol, TimeoutMixin):
             login('')
 
         return 'Discard'
+
+
+    def _ebLogin(self, failure):
+        """
+        """
+        self.transport.write(b"\nLogin incorrect\n")
+        self.transport.write(b"login: ")
+        self.state = "User"
 
 
     def _cbLogin(self, ial):
