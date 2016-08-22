@@ -188,6 +188,7 @@ class HoneyPotTelnetAuthProtocol(AuthenticatingTelnetProtocol, TimeoutMixin):
         Fired on a successful login
         """
         interface, protocol, logout = ial
+        assert interface is ITelnetProtocol
         self.protocol = protocol
         self.logout = logout
         self.state = 'Command'
@@ -202,7 +203,6 @@ class HoneyPotTelnetAuthProtocol(AuthenticatingTelnetProtocol, TimeoutMixin):
         # replace myself with avatar protocol
         protocol.makeConnection(self.transport)
         self.transport.protocol = protocol
-
 
 
 class StripCrTelnetTransport(TelnetTransport):

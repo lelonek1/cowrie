@@ -21,7 +21,7 @@ class HoneyPotTelnetSession(TelnetBootstrapProtocol):
     """
     """
 
-    def __init__(self, username, server):
+    def __init__(self, username, server, *args, **kwargs):
         self.username = username
         self.server = server
         self.cfg = self.server.cfg
@@ -53,6 +53,7 @@ class HoneyPotTelnetSession(TelnetBootstrapProtocol):
         # to be populated by HoneyPotTelnetAuthProtocol after auth
         self.transportId = None
 
+        #TelnetBootstrapProtocol.__init__(self, *args, **kwargs)
 
     def connectionMade(self):
         """
@@ -72,12 +73,12 @@ class HoneyPotTelnetSession(TelnetBootstrapProtocol):
     # TODO do I need to implement connectionLost?
     # XXX verify if HoneyPotTelnetAuthProtocol's connectionLost fires otherwise
     #     we'll have to reimplement some of the stuff here
-    #def connectionLost(self, reason):
-    #    pt = self.transport
+    def connectionLost(self, reason):
+        pt = self.transport
     #    if pt.transport.sessionno in pt.factory.sessions:
     #        del pt.factory.sessions[pt.transport.sessionno]
     #    pt.connectionLost(reason)
-
+        TelnetBootstrapProtocol.connectionLost(self, reason)
 
     def logout(self):
         """
@@ -141,6 +142,7 @@ class TelnetSessionProcessProtocol(protocol.ProcessProtocol):
     def connectionLost(self, reason = None):
         """
         """
+        log.msg("Connection lost, reason: %r" % reason)
         self.session.loseConnection()
 
 
@@ -183,4 +185,5 @@ class TelnetSessionProcessProtocol(protocol.ProcessProtocol):
     def loseConnection(self):
         """
         """
+        log.msg("loseConnection")
         self.session.loseConnection()

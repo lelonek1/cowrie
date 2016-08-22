@@ -297,6 +297,9 @@ class HoneyPotSSHTransport(transport.SSHServerTransport, TimeoutMixin):
             format='Connection lost after %(duration)d seconds',
             duration=duration)
 
+        import sys
+        sys.settrace(None)
+
 
     def sendDisconnect(self, reason, desc):
         """

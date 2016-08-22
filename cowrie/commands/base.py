@@ -150,6 +150,38 @@ class command_exit(HoneyPotCommand):
     def call(self):
         """
         """
+
+        import sys
+
+        def trace_calls(frame, event, arg):
+            if event != 'call':
+                return
+            co = frame.f_code
+            func_name = co.co_name
+            if func_name == 'write':
+                # Ignore write() calls from print statements
+                return
+
+            func_line_no = frame.f_lineno
+            func_filename = co.co_filename
+            if ('json' in func_filename or 'logg' in func_filename or 'string' in func_filename or 'tzhelper' in func_filename
+                    or 'logfile' in func_filename or 'threading' in func_filename or 'six.py' in func_filename
+                    or 'threadable' in func_filename or 'pkg_resources' in func_filename or 'socket.py' in func_filename
+                    or 'output.py' in func_filename or 'copy.py' in func_filename or 'log.py' in func_filename
+                    or '\twisted\internet' in func_filename
+                    or '__get' in func_name or '__set' in func_name
+                    ):
+                return
+            caller = frame.f_back
+            caller_line_no = caller.f_lineno
+            caller_filename = caller.f_code.co_filename
+            print 'Call to %s on line %s of %s from line %s of %s' % \
+                  (func_name, func_line_no, func_filename,
+                   caller_line_no, caller_filename)
+            return
+
+        #sys.settrace(trace_calls)
+
         stat = failure.Failure(error.ProcessDone(status=""))
         self.protocol.terminal.transport.processEnded(stat)
         return
