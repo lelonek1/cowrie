@@ -12,7 +12,7 @@ from twisted.python import log
 from twisted.internet import protocol
 from twisted.conch.telnet import AuthenticatingTelnetProtocol, ECHO, TRAPSIG, \
                                  ITelnetProtocol, ProtocolTransportMixin, \
-                                 SGA, NAWS, MODE, LINEMODE, TelnetTransport
+                                 SGA, NAWS, MODE, LINEMODE, TelnetTransport, OptionRefuseds
 from twisted.protocols.policies import TimeoutMixin
 
 from cowrie.core.credentials import UsernamePasswordIP
@@ -83,11 +83,27 @@ class HoneyPotTelnetAuthProtocol(AuthenticatingTelnetProtocol):
         """
         """
         self.factory.sessions[self.transport.transport.sessionno] = self.transport.transportId
-        
-        # Initial option negotation. Want something at least for Mirai
-        for opt in (NAWS,):
-            self.transport.do(opt).addErrback(log.err)
 
+        def testErr(_stuff=None, _why=None, **kw):
+            if _stuff.type is OptionRefused and _stuff.value.args[0] == ECHO:
+                pass  # expected option refusal
+            else:
+                log.err(_stuff, _why, **kw)
+
+        def willEcho(*args, **kwargs):
+            print 'sending will echo'
+            log.err('sending will echo')
+            self.transport.will(ECHO).addErrback(testErr)
+
+        # Initial option negotation. Want something at least for Mirai
+        #for opt in (SGA,ECHO,):
+        #    self.transport.will(opt).addErrback(log.err)
+        for opt in (ECHO,NAWS,):
+            deferred = self.transport.do(opt).addErrback(testErr)
+            if opt is ECHO:
+                deferred.addBoth(willEcho)
+
+        #self.transport.will(ECHO).addErrback(testErr)
         # I need to doubly escape here since my underlying
         # CowrieTelnetTransport hack would remove it and leave just \n
         self.transport.write(self.factory.banner.replace('\n', '\r\r\n'))
@@ -111,7 +127,7 @@ class HoneyPotTelnetAuthProtocol(AuthenticatingTelnetProtocol):
         self.username = line
         # only send ECHO option if we are chatting with a real Telnet client
         #if self.transport.options: <-- doesn't work
-        self.transport.will(ECHO)
+        self.transport.wont(ECHO)
         # FIXME: this should be configurable or provided via filesystem
         self.transport.write(self.passwordPrompt)
         return 'Password'
