@@ -265,6 +265,31 @@ enabled = true
 
 
 # ============================================================================
+# Device Profile Specific Options
+# ============================================================================
+
+[profile]
+
+# Enable profile support, disabled by default
+enabled = true
+
+# Directory to load profiles from (can be absolute)
+#
+# (default: etc/profiles)
+# ex: /home/cowrie/community-profiles
+#profile_directory=etc/profiles
+
+# Newline sepparated list of enabled profiles
+# Profiles are loaded in the order specified and later profiles override values
+# specified in earlier ones.
+# Each profile is the name of a directory in profile_directory or an absolute
+# path to a directory contanining profile.cfg
+# ex: /home/cowrie/custom-server-profile
+enabled_profiles = OpenSSH_6.0p1-Debian
+
+
+
+# ============================================================================
 # Output Plugins
 # These provide an extensible mechanism to send audit log entries to third
 # parties. The audit entries contain information on clients connecting to
