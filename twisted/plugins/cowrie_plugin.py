@@ -43,7 +43,7 @@ from twisted.application.service import IServiceMaker
 from twisted.application import internet, service
 from twisted.cred import portal
 
-from cowrie.core.config import readConfigFile
+from cowrie.core.config import readConfigFile, loadProfiles
 from cowrie import core
 import cowrie.core.realm
 import cowrie.core.checkers
@@ -93,6 +93,11 @@ class CowrieServiceMaker(object):
             sys.exit(1)
 
         cfg = readConfigFile(cfgfile)
+
+        # load profiles if enabled
+        if cfg.has_option('profile', 'enabled') and \
+                cfg.getboolean('profile', 'enabled'):
+            loadProfiles(cfg)
 
         # ssh is enabled by default
         if cfg.has_option('ssh', 'enabled') == False or \
