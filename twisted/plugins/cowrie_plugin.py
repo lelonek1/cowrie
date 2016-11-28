@@ -43,7 +43,7 @@ from twisted.application.service import IServiceMaker
 from twisted.application import internet, service
 from twisted.cred import portal
 
-from cowrie.core.config import readConfigFile, loadProfiles
+from cowrie.core.config import readConfigFile, loadProfiles, profilesEnabled
 from cowrie import core
 import cowrie.core.realm
 import cowrie.core.checkers
@@ -95,24 +95,14 @@ class CowrieServiceMaker(object):
         cfg = readConfigFile(cfgfile)
 
         # load profiles if enabled
-        if cfg.has_option('profile', 'enabled') and \
-                cfg.getboolean('profile', 'enabled'):
+        if profilesEnabled(cfg):
             loadProfiles(cfg)
 
         # ssh is enabled by default
-        if cfg.has_option('ssh', 'enabled') == False or \
-           (cfg.has_option('ssh', 'enabled') and \
-               cfg.getboolean('ssh', 'enabled') == True):
-            enableSSH = True
-        else:
-            enableSSH = False
+        enableSSH = cfg.getboolean('ssh', 'enabled', fallback=True)
 
         # telnet is disabled by default
-        if cfg.has_option('telnet', 'enabled') and \
-                 cfg.getboolean('telnet', 'enabled') == True:
-            enableTelnet = True
-        else:
-            enableTelnet = False
+        enableTelnet = cfg.getboolean('telnet', 'enabled', fallback=False)
 
         if enableTelnet == False and enableSSH == False:
             print('ERROR: You must at least enable SSH or Telnet')
