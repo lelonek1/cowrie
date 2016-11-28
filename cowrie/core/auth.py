@@ -6,10 +6,12 @@ This module contains ...
 """
 
 import json
+import os
 from os import path
 from random import randint
 
 from twisted.python import log
+from cowrie.core import config
 
 class UserDB(object):
     """
@@ -17,6 +19,7 @@ class UserDB(object):
     """
 
     def __init__(self, cfg):
+        self.cfg = cfg
         self.userdb = []
         self.userdb_file = 'etc/userdb.txt'
         # Backwards compatibility check
@@ -32,22 +35,45 @@ class UserDB(object):
         load the user db
         """
 
-        with open(self.userdb_file, 'r') as f:
-            while True:
-                rawline = f.readline()
-                if not rawline:
-                    break
+        userdb_files = [
+            self.userdb_file
+        ]
 
-                line = rawline.strip()
-                if not line:
-                    continue
+        for profile in config.getProfileNames(self.cfg):
+            opt = self.cfg.get(profile, 'profile_userdb', fallback='ignore').lower()
+            if opt == 'extend':
+                userdb_files.append(os.path.join(
+                    self.cfg.get('profile', 'profile_directory'),
+                    profile, 'userdb.txt'))
+            elif opt in ('overwrite', 'replace'):
+                userdb_files = [os.path.join(
+                    self.cfg.get('profile', 'profile_directory'),
+                    profile, 'userdb.txt')]
+            # else ignore
 
-                if line.startswith('#'):
-                    continue
+        for userdb_file in userdb_files:
+            try:
+                with open(userdb_file, 'r') as f:
+                    while True:
+                        rawline = f.readline()
+                        if not rawline:
+                            break
 
-                (login, uid, passwd) = line.split(':', 2)
+                        line = rawline.strip()
+                        if not line:
+                            continue
 
-                self.userdb.append((login, passwd))
+                        if line.startswith('#'):
+                            continue
+
+                        (login, uid, passwd) = line.split(':', 2)
+
+                        if (login, passwd) not in self.userdb:
+                            # prevent duplicate credentials from being stored and written back out later by save()
+                            self.userdb.append((login, passwd))
+            except IOError as e:
+                log.msg("WARNING: userdb.txt file %s could not be read: %r"
+                        % (userdb_file, e))
 
 
     def save(self):
