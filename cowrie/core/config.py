@@ -6,7 +6,6 @@ This module contains ...
 """
 
 import configparser
-import shlex
 import os
 
 def readConfigFile(cfgfile):
