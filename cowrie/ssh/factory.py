@@ -5,6 +5,7 @@
 This module contains ...
 """
 
+import re
 import time
 
 from twisted.conch.ssh import factory
@@ -67,6 +68,90 @@ class CowrieSSHFactory(factory.SSHFactory):
           'ssh-rsa': keys.Key.fromString(data=rsaPrivKeyString),
           'ssh-dss': keys.Key.fromString(data=dsaPrivKeyString)}
 
+        # Precompute overridden settings so we can warn the user about what
+        # was dropped due to missing Twisted support
+
+        # Allow 'none' to be specified by profiles for ciphers and MACs
+        twistedSupportedCiphers = transport.HoneyPotSSHTransport.supportedCiphers + ['none']
+        twistedSupportedMACs = transport.HoneyPotSSHTransport.supportedMACs + ['none']
+        twistedSupportedPublicKeys = transport.HoneyPotSSHTransport.supportedPublicKeys
+        # zlib@openssh.com works despite not being in Twisted's initial list
+        # so add it here to keep it from getting filtered out later
+        twistedSupportedCompressions = transport.HoneyPotSSHTransport.supportedCompressions + ['zlib@openssh.com']
+        twistedSupportedKeyExchanges = transport.HoneyPotSSHTransport.supportedKeyExchanges[:]
+
+        _modulis = '/etc/ssh/moduli', '/private/etc/moduli'
+        for _moduli in _modulis:
+            try:
+                self.primes = primes.parseModuliFile(_moduli)
+                break
+            except IOError as err:
+                pass
+
+        if not self.primes:
+            if 'diffie-hellman-group-exchange-sha1' in twistedSupportedKeyExchanges:
+                twistedSupportedKeyExchanges.remove('diffie-hellman-group-exchange-sha1')
+                log.msg("No moduli, no diffie-hellman-group-exchange-sha1")
+            if 'diffie-hellman-group-exchange-sha256' in twistedSupportedKeyExchanges:
+                twistedSupportedKeyExchanges.remove('diffie-hellman-group-exchange-sha256')
+                log.msg("No moduli, no diffie-hellman-group-exchange-sha256")
+
+        # Reorder supported ciphers to resemble current openssh more
+        self.options = {
+            'keyExchanges': twistedSupportedKeyExchanges,
+            'ciphers': ['aes128-ctr', 'aes192-ctr', 'aes256-ctr',
+                        'aes128-cbc', '3des-cbc', 'blowfish-cbc',
+                        'cast128-cbc', 'aes192-cbc', 'aes256-cbc'],
+            'publicKeys': filter(lambda x: x in list(self.privateKeys.keys()),
+                                 ['ssh-rsa', 'ssh-dss']),
+            'MACs': ['hmac-md5', 'hmac-sha1'],
+            'compressions': ['zlib@openssh.com', 'zlib', 'none'],
+            'versionString': self.cfg.get('ssh', 'version_string',
+                    fallback=self.cfg.get('honeypot', 'ssh_version_string',
+                                          fallback="SSH-2.0-OpenSSH_6.0p1 Debian-4+deb7u2")),
+        }
+
+        splitRE = re.compile(',\s*|\n')
+        if self.cfg.has_option('ssh', 'supported_key_exchanges'):
+            keyExchanges = filter(lambda x: x in twistedSupportedKeyExchanges,
+                                  splitRE.split(str(self.cfg.get('ssh', 'supported_key_exchanges'))))
+            if keyExchanges:
+                self.options['keyExchanges'] = keyExchanges
+            else:
+                log.msg("WARNING: all listed key exchanges were unsupported, keeping default set")
+
+        if self.cfg.has_option('ssh', 'supported_ciphers'):
+            ciphers = filter(lambda x: x in twistedSupportedCiphers,
+                             splitRE.split(str(self.cfg.get('ssh', 'supported_ciphers'))))
+            if ciphers:
+                self.options['ciphers'] = ciphers
+            else:
+                log.msg("WARNING: all listed ciphers were unsupported, keeping default set")
+
+        if self.cfg.has_option('ssh', 'supported_public_keys'):
+            publicKeys = filter(lambda x: x in twistedSupportedPublicKeys,
+                                splitRE.split(str(self.cfg.get('ssh', 'supported_public_keys'))))
+            if publicKeys:
+                self.options['publicKeys'] = publicKeys
+            else:
+                log.msg("WARNING: all listed public keys were unsupported, keeping default set")
+
+        if self.cfg.has_option('ssh', 'supported_MACs'):
+            MACs = filter(lambda x: x in twistedSupportedMACs,
+                          splitRE.split(str(self.cfg.get('ssh', 'supported_MACs'))))
+            if MACs:
+                self.options['MACs'] = MACs
+            else:
+                log.msg("WARNING: all listed MACs were unsupported, keeping default set")
+
+        if self.cfg.has_option('ssh', 'supported_compressions'):
+            compressions = filter(lambda x: x in twistedSupportedCompressions,
+                                  splitRE.split(str(self.cfg.get('ssh', 'supported_compressions'))))
+            if compressions:
+                self.options['compressions'] = compressions
+            else:
+                log.msg("WARNING: all listed compressions were unsupported, keeping default set")
+
         factory.SSHFactory.startFactory(self)
         log.msg("Ready to accept SSH connections")
 
@@ -88,41 +173,14 @@ class CowrieSSHFactory(factory.SSHFactory):
         @return: The built transport.
         """
 
-        _modulis = '/etc/ssh/moduli', '/private/etc/moduli'
-
         t = transport.HoneyPotSSHTransport()
 
-        try:
-            t.ourVersionString = self.cfg.get('honeypot', 'ssh_version_string')
-        except:
-            t.ourVersionString = "SSH-2.0-OpenSSH_6.0p1 Debian-4+deb7u2"
-
-        t.supportedPublicKeys = list(self.privateKeys.keys())
-
-        for _moduli in _modulis:
-            try:
-                self.primes = primes.parseModuliFile(_moduli)
-                break
-            except IOError as err:
-                pass
-
-        if not self.primes:
-            ske = t.supportedKeyExchanges[:]
-            if 'diffie-hellman-group-exchange-sha1' in ske:
-                ske.remove('diffie-hellman-group-exchange-sha1')
-                log.msg("No moduli, no diffie-hellman-group-exchange-sha1")
-            if 'diffie-hellman-group-exchange-sha256' in ske:
-                ske.remove('diffie-hellman-group-exchange-sha256')
-                log.msg("No moduli, no diffie-hellman-group-exchange-sha256")
-            t.supportedKeyExchanges = ske
-
-        # Reorder supported ciphers to resemble current openssh more
-        t.supportedCiphers = ['aes128-ctr', 'aes192-ctr', 'aes256-ctr',
-            'aes128-cbc', '3des-cbc', 'blowfish-cbc', 'cast128-cbc',
-            'aes192-cbc', 'aes256-cbc']
-        t.supportedPublicKeys = ['ssh-rsa', 'ssh-dss']
-        t.supportedMACs = ['hmac-md5', 'hmac-sha1']
-        t.supportedCompressions = ['zlib@openssh.com', 'zlib', 'none']
+        t.ourVersionString = self.options['versionString']
+        t.supportedKeyExchanges = self.options['keyExchanges']
+        t.supportedCiphers = self.options['ciphers']
+        t.supportedPublicKeys = self.options['publicKeys']
+        t.supportedMACs = self.options['MACs']
+        t.supportedCompressions = self.options['compressions']
 
         t.factory = self
         return t
