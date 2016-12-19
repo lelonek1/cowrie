@@ -16,6 +16,7 @@ from twisted.conch.ssh.common import NS, getNS
 from twisted.conch import error
 
 from cowrie.core import credentials
+from cowrie.core.config import getList
 
 
 class HoneyPotSSHUserAuthServer(userauth.SSHUserAuthServer):
@@ -36,6 +37,9 @@ class HoneyPotSSHUserAuthServer(userauth.SSHUserAuthServer):
         self.bannerSent = False
         self._pamDeferred = None
         userauth.SSHUserAuthServer.serviceStarted(self)
+
+        self.supportedAuthentications = getList(self.transport.factory.cfg, 'ssh', 'supported_authentications',
+                                                self.supportedAuthentications, self.supportedAuthentications)
 
 
     def sendBanner(self):
