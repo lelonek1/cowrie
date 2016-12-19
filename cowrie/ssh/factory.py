@@ -13,6 +13,7 @@ from twisted.conch.ssh import keys
 from twisted.python import log
 from twisted.conch.openssh_compat import primes
 
+from cowrie.core.config import getList
 from cowrie.ssh import connection
 from cowrie.ssh import userauth
 from cowrie.ssh import transport
@@ -107,46 +108,20 @@ class CowrieSSHFactory(factory.SSHFactory):
                                           fallback="SSH-2.0-OpenSSH_6.0p1 Debian-4+deb7u2")),
         }
 
-        splitRE = re.compile(',\s*|\n')
-        if self.cfg.has_option('ssh', 'supported_key_exchanges'):
-            keyExchanges = filter(lambda x: x in twistedSupportedKeyExchanges,
-                                  splitRE.split(str(self.cfg.get('ssh', 'supported_key_exchanges'))))
-            if keyExchanges:
-                self.options['keyExchanges'] = keyExchanges
-            else:
-                log.msg("WARNING: all listed key exchanges were unsupported, keeping default set")
+        self.options['keyExchanges'] = getList(self.cfg, 'ssh', 'supported_key_exchanges',
+                                               twistedSupportedKeyExchanges, self.options['keyExchanges'])
 
-        if self.cfg.has_option('ssh', 'supported_ciphers'):
-            ciphers = filter(lambda x: x in twistedSupportedCiphers,
-                             splitRE.split(str(self.cfg.get('ssh', 'supported_ciphers'))))
-            if ciphers:
-                self.options['ciphers'] = ciphers
-            else:
-                log.msg("WARNING: all listed ciphers were unsupported, keeping default set")
+        self.options['ciphers'] = getList(self.cfg, 'ssh', 'supported_ciphers',
+                                          twistedSupportedCiphers, self.options['ciphers'])
 
-        if self.cfg.has_option('ssh', 'supported_public_keys'):
-            publicKeys = filter(lambda x: x in twistedSupportedPublicKeys,
-                                splitRE.split(str(self.cfg.get('ssh', 'supported_public_keys'))))
-            if publicKeys:
-                self.options['publicKeys'] = publicKeys
-            else:
-                log.msg("WARNING: all listed public keys were unsupported, keeping default set")
+        self.options['publicKeys'] = getList(self.cfg, 'ssh', 'supported_public_keys',
+                                             twistedSupportedPublicKeys, self.options['publicKeys'])
 
-        if self.cfg.has_option('ssh', 'supported_MACs'):
-            MACs = filter(lambda x: x in twistedSupportedMACs,
-                          splitRE.split(str(self.cfg.get('ssh', 'supported_MACs'))))
-            if MACs:
-                self.options['MACs'] = MACs
-            else:
-                log.msg("WARNING: all listed MACs were unsupported, keeping default set")
+        self.options['MACs'] = getList(self.cfg, 'ssh', 'supported_MACs',
+                                       twistedSupportedMACs, self.options['MACs'])
 
-        if self.cfg.has_option('ssh', 'supported_compressions'):
-            compressions = filter(lambda x: x in twistedSupportedCompressions,
-                                  splitRE.split(str(self.cfg.get('ssh', 'supported_compressions'))))
-            if compressions:
-                self.options['compressions'] = compressions
-            else:
-                log.msg("WARNING: all listed compressions were unsupported, keeping default set")
+        self.options['compressions'] = getList(self.cfg, 'ssh', 'supported_compressions',
+                                               twistedSupportedCompressions, self.options['compressions'])
 
         factory.SSHFactory.startFactory(self)
         log.msg("Ready to accept SSH connections")
