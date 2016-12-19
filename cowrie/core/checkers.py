@@ -86,7 +86,7 @@ class HoneypotPasswordChecker(object):
     def checkPamUser(self, username, pamConversion, ip):
         """
         """
-        r = pamConversion((('Password:', 1),))
+        r = pamConversion(((str(self.cfg.get('ssh', 'keyboard_interactive_prompt', fallback='Password:')), 1),))
         return r.addCallback(self.cbCheckPamUser, username, ip)
 
 
