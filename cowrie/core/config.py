@@ -7,6 +7,9 @@ This module contains ...
 
 import configparser
 import os
+import re
+
+from twisted.python import log
 
 def readConfigFile(cfgfile):
     config = configparser.ConfigParser()
@@ -36,7 +39,27 @@ def loadProfiles(cfg):
         try:
             cfg.read(os.path.join(profile_directory, profile_path, 'profile.cfg'))
         except configparser.Error as e:
-            print('WARNING: Profile %s could not be loaded due to error: %r'
+            log.msg('WARNING: Profile %s could not be loaded due to error: %r'
                   % (profile_path, e))
 
     return cfg
+
+def getList(cfg, section, option, twistedSupported, default):
+    keep = []
+    skip = []
+    if cfg.has_option(section, option):
+        for value in re.split(',\s*|\n', str(cfg.get(section, option))):
+            if value in twistedSupported:
+                keep.append(value)
+            else:
+                skip.append(value)
+
+        if skip:
+            log.msg("WARNING: the following %s values were ignored because they are not supported by twisted:\n[%s]" %
+                    (option, ', '.join(skip)))
+
+        if keep:
+            return keep
+        else:
+            log.msg("WARNING: all listed key exchanges were unsupported, keeping default set")
+    return default
