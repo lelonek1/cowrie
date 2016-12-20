@@ -11,8 +11,6 @@ import uuid
 import inspect
 import random
 
-import objgraph
-
 from twisted.python import log
 from twisted.internet import protocol
 from twisted.conch.telnet import AuthenticatingTelnetProtocol, ECHO, TRAPSIG, \
@@ -53,9 +51,6 @@ class HoneyPotTelnetFactory(protocol.ServerFactory):
         except IOError:
             self.banner = ""
 
-        # Interactive protocols are kept here for the interact feature
-        self.sessions = {}
-
         # For use by the uptime command
         self.starttime = time.time()
 
@@ -86,8 +81,6 @@ class HoneyPotTelnetAuthProtocol(AuthenticatingTelnetProtocol):
     def connectionMade(self):
         """
         """
-        self.factory.sessions[self.transport.transport.sessionno] = self.transport.transportId
-        
         self.transport.negotiationMap[NAWS] = self.telnet_NAWS
         # Initial option negotation. Want something at least for Mirai
         for opt in (NAWS,):
@@ -103,8 +96,6 @@ class HoneyPotTelnetAuthProtocol(AuthenticatingTelnetProtocol):
         """
         Fires on pre-authentication disconnects
         """
-        if self.transport.transport.sessionno in self.factory.sessions:
-            del self.factory.sessions[self.transport.transport.sessionno]
         AuthenticatingTelnetProtocol.connectionLost(self, reason)
 
 
@@ -217,7 +208,6 @@ class CowrieTelnetTransport(TelnetTransport, TimeoutMixin):
            session=self.transportId, sessionno='T'+str(sessionno))
         TelnetTransport.connectionMade(self)
 
-        log.msg(objgraph.show_most_common_types())
 
     def write(self, bytes):
         """
