@@ -123,6 +123,7 @@ class HoneyPotTelnetAuthProtocol(AuthenticatingTelnetProtocol):
             d.addCallback(self._cbLogin)
             d.addErrback(self._ebLogin)
 
+        self.transport.write('\r\r\n')
         # are we dealing with a real Telnet client?
         if self.transport.options:
             # stop ECHO
