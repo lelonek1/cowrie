@@ -61,5 +61,5 @@ def getList(cfg, section, option, twistedSupported, default):
         if keep:
             return keep
         else:
-            log.msg("WARNING: all listed key exchanges were unsupported, keeping default set")
+            log.msg("WARNING: all listed %s values were unsupported, keeping default set" % option)
     return default
