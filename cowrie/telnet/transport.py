@@ -51,6 +51,8 @@ class HoneyPotTelnetFactory(protocol.ServerFactory):
         except IOError:
             self.banner = ""
 
+        self.banner = str(self.portal.realm.cfg.get('telnet', 'banner_override', fallback=self.banner))
+
         # For use by the uptime command
         self.starttime = time.time()
 
