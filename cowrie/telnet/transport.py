@@ -88,8 +88,10 @@ class HoneyPotTelnetAuthProtocol(AuthenticatingTelnetProtocol):
 
         # I need to doubly escape here since my underlying
         # CowrieTelnetTransport hack would remove it and leave just \n
-        self.transport.write(self.factory.banner.replace('\n', '\r\r\n'))
-        self.transport.write(self.loginPrompt)
+        if self.factory.cfg.getboolean('telnet', 'display_banner', fallback=True):
+            self.transport.write(self.factory.banner.replace('\n', '\r\r\n'))
+        self.transport.write(str(self.factory.cfg.get('telnet', 'login_prompt',
+                                                      fallback=self.loginPrompt)))
 
 
     def connectionLost(self, reason):
@@ -108,8 +110,8 @@ class HoneyPotTelnetAuthProtocol(AuthenticatingTelnetProtocol):
         # only send ECHO option if we are chatting with a real Telnet client
         #if self.transport.options: <-- doesn't work
         self.transport.willChain(ECHO)
-        # FIXME: this should be configurable or provided via filesystem
-        self.transport.write(self.passwordPrompt)
+        self.transport.write(str(self.factory.cfg.get('telnet', 'password_prompt',
+                                                      fallback=self.passwordPrompt)))
         return 'Password'
 
 
@@ -159,8 +161,10 @@ class HoneyPotTelnetAuthProtocol(AuthenticatingTelnetProtocol):
     def _ebLogin(self, failure):
     # TODO: provide a way to have user configurable strings for wrong password
         self.transport.wontChain(ECHO)
-        self.transport.write("\nLogin incorrect\n")
-        self.transport.write(self.loginPrompt)
+        self.transport.write(str(self.factory.cfg.get('telnet', 'login_incorrect_message',
+                                                      fallback="\nLogin incorrect\r\r\n")))
+        self.transport.write(str(self.factory.cfg.get('telnet', 'login_prompt',
+                                                      fallback=self.loginPrompt)))
         self.state = "User"
 
     # From TelnetBootstrapProtocol in twisted/conch/telnet.py
