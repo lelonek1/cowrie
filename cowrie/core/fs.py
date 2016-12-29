@@ -15,6 +15,8 @@ import errno
 
 from twisted.python import log
 
+from cowrie.core import config
+
 A_NAME, \
     A_TYPE, \
     A_UID, \
@@ -67,7 +69,25 @@ class HoneyPotFilesystem(object):
 
         # Get the honeyfs path from the config file and explore it for file
         # contents:
-        self.init_honeyfs(self.cfg.get('honeypot', 'contents_path'))
+
+        honeyfs_paths = [
+            self.cfg.get('honeypot', 'contents_path')
+        ]
+
+        for profile in config.getProfileNames(self.cfg):
+            opt = self.cfg.get(profile, 'profile_honeyfs', fallback='ignore').lower()
+            if opt == 'extend':
+                honeyfs_paths.append(os.path.join(
+                    self.cfg.get('profile', 'profile_directory'),
+                    profile, 'honeyfs'))
+            elif opt in ('overwrite', 'replace'):
+                userdb_files = [os.path.join(
+                    self.cfg.get('profile', 'profile_directory'),
+                    profile, 'honeyfs')]
+            # else ignore
+
+        for honeyfs_path in honeyfs_paths:
+            self.init_honeyfs(honeyfs_path)
 
 
     def init_honeyfs(self, honeyfs_path):
@@ -181,7 +201,10 @@ class HoneyPotFilesystem(object):
     def update_realfile(self, f, realfile):
         """
         """
-        if not f[A_REALFILE] and os.path.exists(realfile) and \
+        # Allow updating path to realfile even if it is already defined to
+        # allow profiles to override the contents of existing files
+        # Used to be `if not f[A_REALFILE] and os.path.exists(realfile) and ...`
+        if os.path.exists(realfile) and \
                 not os.path.islink(realfile) and os.path.isfile(realfile) and \
                 f[A_SIZE] < 25000000:
             f[A_REALFILE] = realfile
