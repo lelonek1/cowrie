@@ -105,15 +105,15 @@ class CowrieServiceMaker(object):
 
         cfg = readConfigFile(cfgfile)
 
-        # load profiles if enabled
-        if profilesEnabled(cfg):
-            loadProfiles(cfg)
-
         # ssh is enabled by default
         enableSSH = cfg.getboolean('ssh', 'enabled', fallback=True)
 
         # telnet is disabled by default
         enableTelnet = cfg.getboolean('telnet', 'enabled', fallback=False)
+
+        # load profiles if enabled
+        if profilesEnabled(cfg):
+            loadProfiles(cfg)
 
         if enableTelnet == False and enableSSH == False:
             print('ERROR: You must at least enable SSH or Telnet')
