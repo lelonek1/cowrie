@@ -9,6 +9,7 @@
 ##############################################################
 
 import os, pickle, sys, locale, getopt, fnmatch
+import re
 from stat import *
 
 
@@ -52,8 +53,20 @@ def recurse(localroot, root, tree, maxdepth = 100):
         if checkblacklist(fspath):
             continue
 
-
         path = os.path.join(localpath, name)
+
+        if root == '/proc' and re.match('\d+', name):
+            # If we are in /proc and directory name is a number,
+            # this is probably for a PID and we don't want any process
+            # running from a directory in the blacklist to be included
+            pcwd = os.path.join(path,'cwd')
+            try:
+                if os.path.islink(pcwd) and checkblacklist(os.path.realpath(pcwd)):
+                    logit(' Ignoring directory %s because process with pid %s has '
+                          'blacklisted cwd %s' % (path, name, os.path.realpath(pcwd)))
+                    continue
+            except OSError:
+                pass
 
         try:
             if os.path.islink(path):
