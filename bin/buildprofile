@@ -1,0 +1,402 @@
+#!/bin/bash
+
+find_cowrie_directory() {
+    # Determine Cowrie directory
+    case "$0" in
+        /*)
+            COWRIEDIR="$(dirname $0)/.."
+            ;;
+        *)
+            COWRIEDIR="$(dirname $PWD/$0)/.."
+            ;;
+    esac
+    COWRIEDIR="$(cd ${COWRIEDIR} && pwd -P 2>/dev/null | pwd)"
+}
+
+usage (){
+cat << EOFhelp
+usage: bin/createprofile.sh [-d DIR] [-f] [-l DIR] [-t] [-h] PROFILE_NAME
+Automatically generate a profile for use by Cowrie from the current system
+
+  -p, --profile-dir <dir>     directory where profile should be stored (default ${COWRIEDIR}/etc/profiles)
+  -f, --createfs              run createfs script to generate filesystem image
+  -l, --local-dir <dir>       local root directory for filesystem (default is current working directory)
+  -t, --telnet                add entries to profile for Telnet server
+  -S, --no-ssh                skip generating SSH entries (for IoT devices without SSH)
+  -u, --userdb                generate a userdb.txt file and config entries
+  -H, --no-honeyfs            skip copying files for honeyfs
+  -h, --help                  print this help message
+
+EOFhelp
+}
+
+# From https://gist.github.com/davejamesmiller/1965569
+ask() {
+    # http://djm.me/ask
+    local prompt default REPLY
+
+    while true; do
+
+        if [ "${2:-}" = "Y" ]; then
+            prompt="Y/n"
+            default=Y
+        elif [ "${2:-}" = "N" ]; then
+            prompt="y/N"
+            default=N
+        else
+            prompt="y/n"
+            default=
+        fi
+
+        # Ask the question (not using "read -p" as it uses stderr not stdout)
+        echo -n "$1 [$prompt] "
+
+        # Read the answer (use /dev/tty in case stdin is redirected from somewhere else)
+        read REPLY </dev/tty
+
+        # Default?
+        if [ -z "$REPLY" ]; then
+            REPLY=${default}
+        fi
+
+        # Check if the reply is valid
+        case "$REPLY" in
+            Y*|y*) return 0 ;;
+            N*|n*) return 1 ;;
+        esac
+
+    done
+}
+
+find_cowrie_directory
+
+unavailable_option_prefix="# This options's value could not be retrieved automatically\n#"
+
+profile_name=
+profiles_dir=${COWRIEDIR}/etc/profiles
+local_dir=.
+create_fs_image=false
+include_telnet=false
+include_ssh=true
+generate_userdb=false
+include_honeyfs=true
+
+# Files in /etc that should be added to the honeyfs
+PROFILE_ETC_FILES="${PROFILE_ETC_FILES:-group host.conf hostname hosts inittab issue motd passwd resolv.conf shadow}"
+
+# Files in /proc that should be added to the honeyfs
+PROFILE_PROC_FILES="${PROFILE_PROC_FILES:-cpuinfo meminfo mounts net/arp version version_signature}"
+
+# Files in /proc that require sudo/root to access and should be added to the honeyfs
+PROFILE_SUDO_PROC_FILES="${PROFILE_SUDO_PROC_FILES:-modules}"
+
+# Absolute paths to any other files that should be added to the honeyfs
+PROFILE_OTHER_FILES="${PROFILE_OTHER_FILES}"
+
+while [ "$1" != "" ]; do
+    case $1 in
+        -p | --profile-dir )
+            profiles_dir="$2"
+            shift
+            ;;
+        -f | --createfs )
+            create_fs_image=true
+            ;;
+        -l | --local-dir )
+            local_dir="$2"
+            shift
+            ;;
+        -t | --telnet )
+            include_telnet=true
+            ;;
+        -S | --no-ssh )
+            include_ssh=false
+            ;;
+        -u | --userdb )
+            generate_userdb=true
+            ;;
+        -H | --no-honeyfs )
+            include_honeyfs=false
+            ;;
+        -h | --help | -* )
+            usage
+            exit 1
+            ;;
+        * )
+            break
+            ;;
+    esac
+    shift
+done
+
+if [ $# -eq 1 ]; then
+    profile_name=$1
+else
+    usage
+    exit 1
+fi
+
+profile_dir=${profiles_dir}/${profile_name}
+profile_file=${profile_dir}/profile.cfg
+
+echo "Creating profile at ${profile_dir}"
+mkdir ${profile_dir}
+
+cat > ${profile_file} << EOFprofile
+[${profile_name}]
+# Generated with bin/buildprofile at `date` (`date -Iseconds`)
+
+EOFprofile
+
+if ${generate_userdb}; then
+    echo "Generating sample userdb.txt"
+
+cat >> ${profile_file} << EOFprofile
+# How profile's userdb.txt should be handled
+# Supported options are ignore, extend, overwrite/replace
+#   ignore: ignore profile's userdb.txt and don't add anything to global userdb
+#   extend: add all values in profile's userdb.txt to end of global userdb
+#   overwrite: replace all values in global userdb with values from this profile's userdb.txt
+# (default or any other value: ignore)
+profile_userdb = extend
+
+EOFprofile
+
+    touch ${profile_dir}/userdb.txt
+
+else
+    echo "Skipping userdb.txt generation"
+fi
+
+if ${include_honeyfs}; then
+    echo "Copying files to honeyfs for current system"
+
+    if ${create_fs_image}; then
+        # We are creating a new pickled filesystem image, so copied files should replace what was there before
+        config_profile_honeyfs=overwrite
+    else
+        # No filesystem image created, just add files so normally-present files don't go missing
+        config_profile_honeyfs=extend
+    fi
+cat >> ${profile_file} << EOFprofile
+# How profile's honeyfs should be handled
+# Supported options are ignore, extend, overwrite/replace
+#   ignore: ignore profile's honeyfs and don't use files to update presented filesystem
+#   extend: use existing files in honeyfs with files in profile's honeyfs added and overwriting existing file content
+#   overwrite: use only files from this profile's honeyfs, ignoring default and previous profiles' files
+# (default or any other value: ignore)
+profile_honeyfs = ${config_profile_honeyfs}
+
+
+EOFprofile
+
+    honeyfs_dir=${profile_dir}/honeyfs
+    mkdir ${honeyfs_dir}
+
+    for etc_file in ${PROFILE_ETC_FILES}; do
+        mkdir -p "$(dirname ${honeyfs_dir}/etc/${etc_file})"
+        cp "/etc/${etc_file}" "${honeyfs_dir}/etc/${etc_file}"
+    done
+
+    for proc_file in ${PROFILE_PROC_FILES}; do
+        mkdir -p "$(dirname ${honeyfs_dir}/proc/${proc_file})"
+        cat "/proc/${proc_file}" > "${honeyfs_dir}/proc/${proc_file}"
+    done
+
+    copy_sudo_proc_files () {
+        for proc_file in ${PROFILE_SUDO_PROC_FILES}; do
+            mkdir -p "$(dirname ${honeyfs_dir}/proc/${proc_file})"
+            $1 "cat /proc/${proc_file}" > "${honeyfs_dir}/proc/${proc_file}"
+        done
+    }
+    if [ $(id -u) -eq 0 ]; then
+        # Running as root, can just go ahead and copy files
+        copy_sudo_proc_files "sh -c"
+    else
+        echo "Accessing some files in /proc requires root privileges."
+        if ask "Would you like to elevate to access them?" Y; then
+            if command -v sudo >/dev/null 2>&1 && ask "Is sudo available and configured on this system?"; then
+                copy_sudo_proc_files "sudo sh -c"
+            else
+                copy_sudo_proc_files "su -c"
+            fi
+        else
+            if ask "Would you like to copy them without root? (contents may be different)" Y; then
+                copy_sudo_proc_files "sh -c"
+            fi
+        fi
+    fi
+
+    for other_file in ${PROFILE_OTHER_FILES}; do
+        mkdir -p "$(dirname ${honeyfs_dir}/${other_file})"
+        cp ${other_file} ${honeyfs_dir}/${other_file}
+    done
+
+fi
+
+hostnamevar="$(hostname)"
+cat >> ${profile_file} << EOFprofile
+[honeypot]
+
+hostname = ${hostnamevar}
+
+EOFprofile
+
+
+if ${create_fs_image}; then
+    echo "Creating filesystem image with createfs"
+    ${COWRIEDIR}/bin/createfs -p -l ${local_dir} -o ${profile_dir}/fs.pickle
+
+cat >> ${profile_file} << EOFprofile
+filesystem_file = `realpath --relative-to=${COWRIEDIR} ${profile_dir}`/fs.pickle
+
+EOFprofile
+
+fi
+
+if ${include_ssh}; then
+    echo "Getting SSH server configuration"
+
+    if command -v sshd >/dev/null 2>&1; then
+        # sshd exists, try to extract config info from it
+        # Kludge to get the version string, OpenSSH only seems to output it when receiving invalid command line arguments
+        sshd_output="$(sshd -T 2>/dev/null)"
+        config_version_string="SSH-2.0-$(sshd --error 2>&1 | grep , | cut -d , -f 1)"
+        supported_key_exchanges="$(echo "${sshd_output}" | grep kexalgorithms | cut -d ' ' -f 2)"
+        supported_ciphers="$(echo "${sshd_output}" | grep ciphers | cut -d ' ' -f 2)"
+        supported_public_keys="$(echo "${sshd_output}" | grep pubkeyacceptedkeytypes | cut -d ' ' -f 2)"
+        supported_MACs="$(echo "${sshd_output}" | grep macs | cut -d ' ' -f 2)"
+    fi
+    if command -v ssh >/dev/null 2>&1; then
+        echo "Some SSH settings must be retrieved by connecting to the server with a client."
+        if ask "Connect to localhost with ssh?" Y; then
+            ssh_output="$(ssh -o PreferredAuthentications=publickey -o PubkeyAuthentication=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -vv 127.0.0.1 2>&1 )"
+            [ -z "${supported_key_exchanges}" ] && supported_key_exchanges="$(echo "${ssh_output}" | grep -m 1 -A 10 'peer server KEXINIT proposal' | grep 'KEX algorithms:' | cut -d ' ' -f 4 | tr -d '\r\n')"
+            [ -z "${supported_ciphers}" ] && supported_ciphers="$(echo "${ssh_output}" | grep -m 1 -A 10 'peer server KEXINIT proposal' | grep 'ciphers stoc:' | cut -d ' ' -f 4 | tr -d '\r\n')"
+            [ -z "${supported_public_keys}" ] && supported_public_keys="$(echo "${ssh_output}" | grep -m 1 -A 10 'peer server KEXINIT proposal' | grep 'host key algorithms:' | cut -d ' ' -f 5 | tr -d '\r\n')"
+            [ -z "${supported_MACs}" ] && supported_MACs="$(echo "${ssh_output}" | grep -m 1 -A 10 'peer server KEXINIT proposal' | grep 'MACs stoc:' | cut -d ' ' -f 4 | tr -d '\r\n')"
+            supported_authentications="$(echo "${ssh_output}" | grep 'Authentications that can continue:' | cut -d ' ' -f 6 | tr -d '\r\n')"
+            supported_compressions="$(echo "${ssh_output}" | grep -m 1 -A 10 'peer server KEXINIT proposal' | grep -m 1 'compression stoc:' | cut -d ' ' -f 4 | tr -d '\r\n')"
+        fi
+    else
+        echo "No SSH client was found on this system.  You must retrieve the authentication and compression options manually."
+        #sshcmd="ssh -o PreferredAuthentications=publickey -o PubkeyAuthentication=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -vv 127.0.0.1"
+        #echo supported_key_exchanges="$(${sshcmd} 2>&1 | grep -m 1 -A 10 'peer server KEXINIT proposal' | grep 'KEX algorithms:' | cut -d ' ' -f 4)" &&\
+        #echo supported_ciphers="$(${sshcmd} 2>&1 | grep -m 1 -A 10 'peer server KEXINIT proposal' | grep 'ciphers stoc:' | cut -d ' ' -f 4)" &&\
+        #echo supported_public_keys="$(${sshcmd} 2>&1 | grep -m 1 -A 10 'peer server KEXINIT proposal' | grep 'host key algorithms:' | cut -d ' ' -f 5)" &&\
+        #echo supported_MACs="$(${sshcmd} 2>&1 | grep -m 1 -A 10 'peer server KEXINIT proposal' | grep 'MACs stoc:' | cut -d ' ' -f 4)" &&\
+        #echo supported_authentications="$(${sshcmd} 2>&1 | grep 'Authentications that can continue:' | cut -d ' ' -f 6)" &&\
+        #echo supported_compressions="$(${sshcmd} 2>&1 | grep -m 1 -A 10 'peer server KEXINIT proposal' | grep -m 1 'compression stoc:' | cut -d ' ' -f 4)"
+    fi
+
+    [ -z "${config_version_string}" ] && config_version_string_prefix="${unavailable_option_prefix}"
+    [ -z "${supported_key_exchanges}" ] && supported_key_exchanges_prefix="${unavailable_option_prefix}"
+    [ -z "${supported_ciphers}" ] && supported_ciphers_prefix="${unavailable_option_prefix}"
+    [ -z "${supported_public_keys}" ] && supported_public_keys_prefix="${unavailable_option_prefix}"
+    [ -z "${supported_MACs}" ] && supported_MACs_prefix="${unavailable_option_prefix}"
+    [ -z "${supported_authentications}" ] && supported_authentications_prefix="${unavailable_option_prefix}"
+    [ -z "${supported_compressions}" ] && supported_compressions_prefix="${unavailable_option_prefix}"
+
+cat >> ${profile_file} << EOFprofile
+
+[ssh]
+
+${config_version_string_prefix}version_string = ${config_version_string}
+
+# Obtain these settings from your OpenSSH server with \`sshd -T\`
+# These lists will be automatically filtered to only values that Twisted
+# supports to prevent negotiating unsupported options which will cause
+# client connections to fail
+${supported_key_exchanges_prefix}supported_key_exchanges = ${supported_key_exchanges}
+
+${supported_key_exchanges_prefix}supported_ciphers = ${supported_ciphers}
+
+${supported_public_keys_prefix}supported_public_keys = ${supported_public_keys}
+
+${supported_MACs_prefix}supported_MACs = ${supported_MACs}
+
+${supported_compressions_prefix}supported_compressions = ${supported_compressions}
+
+${supported_authentications_prefix}supported_authentications = ${supported_authentications}
+
+# Prompt displayed for keyboard-interactive authentication method
+#keyboard_interactive_prompt = #This cannot currently be retrieved automatically
+
+EOFprofile
+
+fi
+
+if ${include_telnet}; then
+    echo "Getting Telnet server configuration"
+
+    banner_contents="$(cat /etc/issue.net)"
+
+    echo "Most Telnet settings must be retrieved by connecting to the server with a client."
+    if command -v telnet >/dev/null 2>&1 && ask "Connect to localhost with telnet?" Y; then
+        echo "This will take about a minute.  Connecting..."
+        telnet_output="$( (sleep 5 && printf '\n' && sleep 5 && printf '\n' && sleep 5 && printf '\n' && sleep 10) | telnet 127.0.0.1)"
+        if echo "${telnet_output}" | grep -q "${banner_contents}"; then
+            display_banner=true
+        else
+            display_banner=false
+        fi
+        password_prompt="$(echo "${telnet_output}" | tail -n 1 | tr -d '\r\n')"
+        login_prompt="$(echo "${telnet_output}" | tail -n 2 | head -n 1 | sed "s/${hostnamevar}/\${honeypot:hostname}/" | tr -d '\r\n')"
+        login_incorrect_message="$(echo "${telnet_output}" | tail -n 3 | head -n 1 | tr -d '\r\n')"
+    else
+        echo "No telnet client available, cannot retrieve settings automatically"
+    fi
+
+    [ -z "${login_prompt}" ] && login_prompt_prefix="${unavailable_option_prefix}"
+    [ -z "${login_incorrect_message}" ] && login_incorrect_message_prefix="${unavailable_option_prefix}"
+    [ -z "${password_prompt}" ] && password_prompt_prefix="${unavailable_option_prefix}"
+    [ -z "${display_banner}" ] && display_banner_prefix="${unavailable_option_prefix}"
+    [ -z "${banner_contents}" ] && banner_contents_prefix="${unavailable_option_prefix}"
+
+cat >> ${profile_file} << EOFprofile
+
+[telnet]
+
+${login_prompt_prefix}login_prompt = ${login_prompt}\${empty}
+
+${login_incorrect_message_prefix}login_incorrect_message = \${\\n}${login_incorrect_message}\${t\\r\\n}
+
+${password_prompt_prefix}password_prompt = ${password_prompt}\${empty}
+
+${display_banner_prefix}display_banner = ${display_banner}
+
+${banner_contents_prefix}banner_override = ${banner_contents}\${\\n}
+
+EOFprofile
+fi
+
+# Get uname output
+uname_kernel_name="$(uname -s)"
+uname_kernel_release="$(uname -r)"
+uname_kernel_version="$(uname -v)"
+uname_machine="$(uname -m)"
+uname_processor="$(uname -p 2>/dev/null)" || uname_processor='unknown'
+uname_hardware_platform="$(uname -i 2>/dev/null)" || uname_hardware_platform='unknown'
+uname_operating_system="$(uname -o 2>/dev/null)" || uname_operating_system='unknown'
+uname_version="$(uname --version | sed 's/$/\${\\n}/' | tr -d '\n')"
+uname_help="$(uname --help | sed 's/$/\${\\n}/' | tr -d '\n')"
+
+cat >> ${profile_file} << EOFprofile
+
+[uname]
+# Version strings for each uname parameter
+
+uname_version = ${uname_version}
+uname_help = ${uname_help}
+
+kernel_name = ${uname_kernel_name}
+kernel_release = ${uname_kernel_release}
+kernel_version = ${uname_kernel_version}
+machine = ${uname_machine}
+processor = ${uname_processor}
+hardware_platform = ${uname_hardware_platform}
+operating_system = ${uname_operating_system}
+
+EOFprofile
+
+echo "Profile generation complete!"
