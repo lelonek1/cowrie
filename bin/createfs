@@ -22,6 +22,7 @@ VERBOSE = False
 blacklist_files = [
             '/root/fs.pickle',
             '/root/createfs',
+            '/media',
             '*cowrie*',
             '*kippo*',
             ]
@@ -48,68 +49,71 @@ def recurse(localroot, root, tree, maxdepth = 100):
        logit(' Cannot access %s\n' % localpath)
        return
 
-    for name in os.listdir(localpath):
-        fspath = os.path.join(root, name)
-        if checkblacklist(fspath):
-            continue
+    try:
+        for name in os.listdir(localpath):
+            fspath = os.path.join(root, name)
+            if checkblacklist(fspath):
+                continue
 
-        path = os.path.join(localpath, name)
+            path = os.path.join(localpath, name)
 
-        if root == '/proc' and re.match('\d+', name):
-            # If we are in /proc and directory name is a number,
-            # this is probably for a PID and we don't want any process
-            # running from a directory in the blacklist to be included
-            pcwd = os.path.join(path,'cwd')
+            if root == '/proc' and re.match('\d+', name):
+                # If we are in /proc and directory name is a number,
+                # this is probably for a PID and we don't want any process
+                # running from a directory in the blacklist to be included
+                pcwd = os.path.join(path,'cwd')
+                try:
+                    if os.path.islink(pcwd) and checkblacklist(os.path.realpath(pcwd)):
+                        logit(' Ignoring directory %s because process with pid %s has '
+                              'blacklisted cwd %s' % (path, name, os.path.realpath(pcwd)))
+                        continue
+                except OSError:
+                    pass
+
             try:
-                if os.path.islink(pcwd) and checkblacklist(os.path.realpath(pcwd)):
-                    logit(' Ignoring directory %s because process with pid %s has '
-                          'blacklisted cwd %s' % (path, name, os.path.realpath(pcwd)))
-                    continue
+                if os.path.islink(path):
+                    s = os.lstat(path)
+                else:
+                    s = os.stat(path)
             except OSError:
-                pass
-
-        try:
-            if os.path.islink(path):
-                s = os.lstat(path)
-            else:
-                s = os.stat(path)
-        except OSError:
-            continue
-
-        entry = [name, T_FILE, s.st_uid, s.st_gid, s.st_size, s.st_mode, \
-            int(s.st_mtime), [], None, None]
-
-        if S_ISLNK(s[ST_MODE]):
-            if not os.access(path, os.R_OK):
-                logit(' Cannot access link: %s\n' % path)
                 continue
-            realpath = os.path.realpath(path)
-            if not realpath.startswith(localroot):
-                logit(' Link "%s" has real path "%s" outside local root "%s"\n' \
-                    % (path, realpath, localroot))
-                continue
-            else:
-                entry[A_TYPE] = T_LINK
-                entry[A_TARGET] = realpath[len(localroot):]
-        elif S_ISDIR(s[ST_MODE]):
-            entry[A_TYPE] = T_DIR
-            if  (PROC or not localpath.startswith('/proc/')) and maxdepth > 0:
-                recurse(localroot, fspath, entry[A_CONTENTS], maxdepth - 1)
-        elif S_ISREG(s[ST_MODE]):
-            entry[A_TYPE] = T_FILE
-        elif S_ISBLK(s[ST_MODE]):
-            entry[A_TYPE] = T_BLK
-        elif S_ISCHR(s[ST_MODE]):
-            entry[A_TYPE] = T_CHR
-        elif S_ISSOCK(s[ST_MODE]):
-            entry[A_TYPE] = T_SOCK
-        elif S_ISFIFO(s[ST_MODE]):
-            entry[A_TYPE] = T_FIFO
-        else:
-            sys.stderr.write('We should handle %s' % path)
-            sys.exit(1)
 
-        tree.append(entry)
+            entry = [name, T_FILE, s.st_uid, s.st_gid, s.st_size, s.st_mode, \
+                int(s.st_mtime), [], None, None]
+
+            if S_ISLNK(s[ST_MODE]):
+                if not os.access(path, os.R_OK):
+                    logit(' Cannot access link: %s\n' % path)
+                    continue
+                realpath = os.path.realpath(path)
+                if not realpath.startswith(localroot):
+                    logit(' Link "%s" has real path "%s" outside local root "%s"\n' \
+                        % (path, realpath, localroot))
+                    continue
+                else:
+                    entry[A_TYPE] = T_LINK
+                    entry[A_TARGET] = realpath[len(localroot):]
+            elif S_ISDIR(s[ST_MODE]):
+                entry[A_TYPE] = T_DIR
+                if  (PROC or not localpath.startswith('/proc/')) and maxdepth > 0:
+                    recurse(localroot, fspath, entry[A_CONTENTS], maxdepth - 1)
+            elif S_ISREG(s[ST_MODE]):
+                entry[A_TYPE] = T_FILE
+            elif S_ISBLK(s[ST_MODE]):
+                entry[A_TYPE] = T_BLK
+            elif S_ISCHR(s[ST_MODE]):
+                entry[A_TYPE] = T_CHR
+            elif S_ISSOCK(s[ST_MODE]):
+                entry[A_TYPE] = T_SOCK
+            elif S_ISFIFO(s[ST_MODE]):
+                entry[A_TYPE] = T_FIFO
+            else:
+                sys.stderr.write('We should handle %s' % path)
+                sys.exit(1)
+
+            tree.append(entry)
+    except OSError as e:
+        logit("OSError: [Errno %d] %s: '%s'" % (e.errno, e.message, e.filename))
 
 def help(brief = False):
     print( 'Usage: %s [-h] [-v] [-p] [-l dir] [-d maxdepth] [-o file]\n' % \
@@ -155,5 +159,9 @@ if __name__ == '__main__':
 
     if output:
         pickle.dump(tree, open(output, 'wb'))
+        import json
+        json.dump(tree, open(output+'.json', 'wb'), indent=1)
     else:
-        print(pickle.dumps(tree))
+        #print(pickle.dumps(tree))
+        import json
+        print json.dumps(tree, indent=2)
