@@ -22,7 +22,6 @@ VERBOSE = False
 blacklist_files = [
             '/root/fs.pickle',
             '/root/createfs',
-            '/media',
             '*cowrie*',
             '*kippo*',
             ]
@@ -159,9 +158,5 @@ if __name__ == '__main__':
 
     if output:
         pickle.dump(tree, open(output, 'wb'))
-        import json
-        json.dump(tree, open(output+'.json', 'wb'), indent=1)
     else:
-        #print(pickle.dumps(tree))
-        import json
-        print json.dumps(tree, indent=2)
+        print(pickle.dumps(tree))
