@@ -82,7 +82,7 @@ generate_userdb=false
 include_honeyfs=true
 
 # Files in /etc that should be added to the honeyfs
-PROFILE_ETC_FILES="${PROFILE_ETC_FILES:-group host.conf hostname hosts inittab issue motd passwd resolv.conf shadow}"
+PROFILE_ETC_FILES="${PROFILE_ETC_FILES:-group host.conf hostname hosts inittab issue issue.net motd passwd resolv.conf shadow}"
 
 # Files in /proc that should be added to the honeyfs
 PROFILE_PROC_FILES="${PROFILE_PROC_FILES:-cpuinfo meminfo mounts net/arp version version_signature}"
