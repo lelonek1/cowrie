@@ -1,0 +1,2 @@
+IP address       HW type     Flags       HW address            Mask     Device
+192.168.56.1     0x1         0x2         0a:00:27:00:00:12     *        enp0s3
