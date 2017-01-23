@@ -1,0 +1,17 @@
+        total:    used:    free:  shared: buffers:  cached:
+Mem:  29913088 10964992 18948096        0  1314816  3907584
+Swap:        0        0        0
+MemTotal:        29212 kB
+MemFree:         18504 kB
+MemShared:           0 kB
+Buffers:          1284 kB
+Cached:           3816 kB
+SwapCached:          0 kB
+Active:           3352 kB
+Inactive:         1772 kB
+HighTotal:           0 kB
+HighFree:            0 kB
+LowTotal:        29212 kB
+LowFree:         18504 kB
+SwapTotal:           0 kB
+SwapFree:            0 kB

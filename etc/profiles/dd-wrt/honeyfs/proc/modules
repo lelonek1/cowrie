@@ -1,0 +1,5 @@
+etherip                 5104   0 (unused)
+ip_nat_pptp             2560   0 (unused)
+ip_conntrack_pptp       3036   1
+ip_nat_proto_gre        1664   0 (unused)
+ip_conntrack_proto_gre    2584   0 [ip_nat_pptp ip_conntrack_pptp]

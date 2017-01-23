@@ -1,0 +1,5 @@
+rootfs / rootfs rw 0 0
+/dev/root / squashfs ro 0 0
+none /dev devfs rw 0 0
+proc /proc proc rw 0 0
+ramfs /tmp ramfs rw 0 0
